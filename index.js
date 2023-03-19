@@ -58,7 +58,7 @@ app.get('/', (req, res) => {
 	  });
 	}
 	else{
-	  connection.query('SELECT * FROM Enrollment JOIN Courses ON Enrollment.course_id = Courses.course_id WHERE univ_id',[univ_id],(err, courses) => {
+	  connection.query('SELECT * FROM Enrollment JOIN Courses ON Enrollment.course_id = Courses.course_id WHERE univ_id = ?',[univ_id],(err, courses) => {
 		if(err) {res.send('서버 오류 발생.');return}
 		let courseName = {}
 		courses.forEach((value) => {
