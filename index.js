@@ -142,12 +142,19 @@ app.post('/delete-post', async (req, res) => {
 app.post('/create-course', async (req, res) => {
   const decodedToken = await verifyToken(req);
   if (!decodedToken) {
-	res.status(400).send('로그인이 안되어있습니다.');
+	res.status(401).send('로그인이 안되어있습니다.');
 	return;
   }
   const courseID = req.body.course_id;
   const courseName = req.body.course_name;
-  console.log(courseID, courseName);
+  if(!RegExp(/[A-Z]{4}[0-9]{3}/g).test(courseID)){
+	res.status(406).send('잘못된 강의 코드 형식입니다!');
+	return;
+  }
+  if(courseName == ''){
+	res.status(406).send('강의 이름이 비어있습니다!');
+	return;
+  }
   const univID = decodedToken.univ_id;
   connection.query('INSERT INTO Courses VALUES(?,?,?)', [courseID, univID, courseName], (err, result) => {
 	if(err){ 
@@ -216,7 +223,14 @@ app.post('/login', (req, res) => {
   const { id, pw } = req.body;
   console.log(id, pw);
   connection.query('SELECT * FROM Users WHERE id = ?', [id], (err, result) => {
-	console.log(result[0].hash);
+	if(err){
+	  res.status(400).send('서버의 상태가 좋지 않습니다.');
+	  return;
+	}
+	if(result.length == 0){
+	  res.status(401).send('존재하지 않는 계정입니다!');
+	  return;
+	}
 	const salt = result[0].hash.split(':')[0];
 	const hash = result[0].hash.split(':')[1];
 	const univ_id = result[0].univ_id;
