@@ -307,7 +307,7 @@ app.post('/drop', async (req, res) => {
 	res.status(401).send('로그인이 안되어있습니다.');
 	return;
   }
-  const univID = req.body.univ_id ?? decodedToken.univ_id;
+  const univID = req.body.univ_id ? req.body.univ_id :  decodedToken.univ_id;
   const courseID = req.body.course_id;
   console.log(univID, courseID);
   connection.query('DELETE FROM Enrollment WHERE univ_id = ? AND course_id = ?', [univID, courseID], (err, result) => {
