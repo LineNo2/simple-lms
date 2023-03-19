@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+	<meta charset="UTF-8">
+	<title>simple lms</title>
+	<link href="https://cdn.quilljs.com/1.0.0/quill.snow.css" rel="stylesheet" />
+	<script>
+	  let courseNames = ${courseName};
+	
+      function buildCourseList(){
+		let courseList = Object.entries(courseNames);
+		let courseListDisplay = document.querySelector('#course-list-display');
+		courseList.sort();
+		for(const [k, v] of courseList){
+		  let courseButton = document.createElement('button');
+		  courseButton.setAttribute('onclick', 'viewCourse("' + k + '")');
+		  courseButton.setAttribute('class', 'course-button');
+		  courseButton.innerHTML = '<h3>' + k + '</h3>' + '<p>' + v + '</p>';
+		  courseListDisplay.appendChild(courseButton);
+		}
+	  }
+	  function viewCourse(courseId) {
+		const xhr = new XMLHttpRequest();
+		const data = {
+		  course_id : courseId
+		};
+		console.log(data);
+		xhr.open('GET', '/view-course?course_id='+courseId);
+		xhr.setRequestHeader('Content-Type', 'application/json');
+		xhr.onload = function() {
+		  if (xhr.status !== 200) {
+			alert(xhr.responseText);
+		  } 
+		  togglePostDisplay();
+		  updatePostDisplay(courseId, JSON.parse(xhr.responseText));
+		};
+		xhr.send(JSON.stringify(data));
+	  }
+  function togglePostDisplay(){
+	let postDisplay = document.querySelector('#post-display');
+	if(postDisplay.style.display == 'none'){
+	  postDisplay.style.display = 'block';
+	}
+	else{
+	  postDisplay.style.display = 'none';
+	}
+  }
+  function updatePostDisplay(courseID, contents){
+	document.querySelector('#course-title').innerHTML = courseID + ' : ' + courseNames[courseID];
+	let postList = document.querySelector('#post-list-display');
+	let button = document.createElement('div');
+	button.innerHTML = '<input type="button" value="드랍!" onclick="drop(\\'' + courseID + '\\')"/>';
+	postList.innerHTML = '';
+	if(contents.length == 0){
+	  postList.innerHTML = '<i>아직 게시물이 없네요..</i>';
+	  postList.append(button);
+	  return;
+	}
+	contents.forEach((arr) => {
+	  let post = document.createElement('div');
+	  post.setAttribute('class','post-wrapper');
+	  post.innerHTML = '<h3>' + arr.title + '</h3><h4>생성 일시 : ' + arr.created_at + '</h4><div>' + arr.body       + '</div>' +'<hr>';
+	  postList.append(post);
+	});
+	  postList.append(button);
+  }
+  function logout(){
+	const xhr = new XMLHttpRequest();
+	xhr.open('GET', '/logout');
+	xhr.setRequestHeader('Content-Type', 'application/json');
+	xhr.onload = function() {
+	  alert(xhr.responseText);
+	  if(xhr.status == 200){
+		window.location = '/login';
+	  }
+	}
+	xhr.send();
+  }
+  function search(){
+	const xhr = new XMLHttpRequest();
+	const data = {
+	  keyword : document.querySelector('#keyword').value
+	};
+	xhr.open('POST', '/search');
+	xhr.setRequestHeader('Content-Type', 'application/json');
+	xhr.onload = function() {
+	  if(xhr.status !== 200){
+		window.location = '/login';
+	  }
+	  let result = JSON.parse(xhr.responseText);
+	  buildSearchResult(result);
+	}
+	xhr.send(JSON.stringify(data));
+  }
+  function buildSearchResult(result){
+	let resultDisplay = document.querySelector('#search-result-display');
+	resultDisplay.innerHTML = '';
+	result.forEach( (arr) => {
+	  let searchResult = document.createElement('div');
+	  searchResult.setAttribute('class','search-result');
+	  searchResult.innerHTML = '<h3>' + arr.course_id  + ' ' + arr.class_name + '</h3><p>' + arr.name + ' 교수</p><input type="button" value="신청" onclick="enroll(\\'' + arr.course_id + '\\')"/>';
+	  resultDisplay.append(searchResult);
+	});
+  }
+  function enroll(courseID){
+	const xhr = new XMLHttpRequest();
+	const data = {
+	  course_id:courseID 
+	};
+	xhr.open('POST', '/enroll');
+	xhr.setRequestHeader('Content-Type', 'application/json');
+	xhr.onload = function() {
+	  alert(xhr.responseText);
+	  if(xhr.status === 409){
+		return;
+	  }
+	  if(xhr.status === 401 || xhr.status === 402){
+		window.location = '/login';
+		return;
+	  }
+	  window.location.reload();
+	}
+	xhr.send(JSON.stringify(data));
+  }
+function drop(courseID, univID){
+    flag = confirm('정말 드랍할건가요?');
+    if(!flag){return;}
+	const xhr = new XMLHttpRequest();
+	const data = {
+	  course_id:courseID ,
+	  univ_id:univID
+	};
+	xhr.open('POST', '/drop');
+	xhr.setRequestHeader('Content-Type', 'application/json');
+	xhr.onload = function() {
+	  alert(xhr.responseText);
+	  if(xhr.status === 401 || xhr.status === 402){
+		window.location = '/login';
+		return;
+	  }
+	  window.location.reload();
+	}
+	xhr.send(JSON.stringify(data));
+}
+  function updateStream(){
+	const xhr = new XMLHttpRequest();
+	xhr.open('POST', '/stream-post');
+	xhr.setRequestHeader('Content-Type', 'application/json');
+	xhr.onload = function() {
+	  if(xhr.status === 401 || xhr.status === 402){
+		window.location = '/login';
+	  }
+	  let result = JSON.parse(xhr.responseText);
+	  buildStreamUpdate(result);
+	}
+	xhr.send();
+  }
+function buildStreamUpdate(contents){
+	let postList = document.querySelector('#stream-posts');
+	postList.innerHTML = '';
+	if(contents.length == 0){
+	  postList.innerHTML = '<i>아직 게시물이 없네요..</i>';
+	  postList.append(button);
+	  return;
+	}
+	contents.forEach((arr) => {
+	  let post = document.createElement('div');
+	  post.setAttribute('class','post-wrapper');
+	  post.innerHTML = '<h3>' + arr.title + '</h3><h4>생성 일시 : ' + arr.created_at + '</h4><div>' + arr.body       + '</div>' + '<p>' + arr.course_id + ' - ' + arr.class_name +'</p>' +'<hr>';
+	  postList.append(post);
+	});
+  postList.append(button);
+}
+  </script>
+  <style>
+	* {
+	  margin: 0px;
+	  padding: 0px;
+	}
+
+	ul, ol {
+	  list-style: none;
+	}
+
+	a {
+	  text-decoration: none
+	}
+	#post-display {
+	  z-index:1;
+	  position:absolute;
+	  left:5vw;
+	  top:5vh;
+	  background-color: white;
+	  width:90vw;
+	  height:90vh;
+	}
+	#post-list-display{
+	  overflow-y:auto;
+	  height: 40vh;
+	}
+	#text-editor{
+	  height: 40vh;
+	}
+	input[type="text"]{
+	  outline:none;
+	  width: 100%;
+	  border-color: black;
+	}
+
+  </style>
+  </head>
+  <body onload="buildCourseList()">
+	<h1>Simple LMS</h1>
+	<h2>login as : ${id} / ${name} 학생 / ${univ_id}</h2>
+	<input type="button" value="로그아웃" onclick="logout()"/>
+	<div id="course-list-display">
+	</div>
+	<h2>수강신청</h2>
+	<input type="text" placeholder="COSE321" id="keyword"/>
+	<input type="button" value="검색" onclick="search()"/>
+	<div id="search-result-display">
+	</div>
+	<h2>활동 스트림</h2>
+	<input type="button" value="업데이트" onclick="updateStream()"/>
+	<div id="stream-posts">
+	</div>
+	<div id="post-display" style="display:none">
+	  <input value="X" type="button" onclick="togglePostDisplay()" style="position:relative;"/>
+	  <h2 id="course-title"></h2>
+	  <hr>
+	  <h3> 게시물 </h3>
+	  <hr>
+	  <div id="post-list-display">
+	  </div>
+	</div>
+  </body>
+</html>

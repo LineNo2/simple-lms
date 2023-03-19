@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+	<meta charset="UTF-8">
+	<title>simple lms</title>
+	<link href="https://cdn.quilljs.com/1.0.0/quill.snow.css" rel="stylesheet" />
+	<script>
+	  let courseNames = ${courseName};
+	
+      function buildCourseList(){
+		let courseList = Object.entries(courseNames);
+		let courseListDisplay = document.querySelector('#course-list-display');
+		courseList.sort();
+		for(const [k, v] of courseList){
+		  let courseButton = document.createElement('button');
+		  courseButton.setAttribute('onclick', 'viewCourse("' + k + '")');
+		  courseButton.setAttribute('class', 'course-button');
+		  courseButton.innerHTML = '<h3>' + k + '</h3>' + '<p>' + v + '</p>';
+		  courseListDisplay.appendChild(courseButton);
+		}
+	  }
+	  function viewCourse(courseId) {
+		const xhr = new XMLHttpRequest();
+		const data = {
+		  course_id : courseId
+		};
+		console.log(data);
+		xhr.open('GET', '/view-course?course_id='+courseId);
+		xhr.setRequestHeader('Content-Type', 'application/json');
+		xhr.onload = function() {
+		  if (xhr.status !== 200) {
+			alert(xhr.responseText);
+		  } 
+		  toggler('#post-display');
+		  updatePostDisplay(courseId, JSON.parse(xhr.responseText));
+		};
+		xhr.send(JSON.stringify(data));
+	  }
+  function toggler(query){
+	let postDisplay = document.querySelector(query);
+	if(postDisplay.style.display == 'none'){
+	  postDisplay.style.display = 'block';
+	}
+	else{
+	  postDisplay.style.display = 'none';
+	}
+  }
+  function updatePostDisplay(courseID, contents){
+	document.querySelector('#course-title').innerHTML = courseID + ' : ' + courseNames[courseID] + '<input type="button" value="학생 관리" onclick="studentManagement(\\'' + courseID + '\\')"/>';
+	document.querySelector('#submit-post').onclick = () => {submitPost(courseID)};
+	let postList = document.querySelector('#post-list-display');
+	postList.innerHTML = '';
+	if(contents.length == 0){
+	  postList.innerHTML = '<i>아직 게시물이 없네요..</i>';
+	  return;
+	}
+	contents.forEach((arr) => {
+	  let post = document.createElement('div');
+	  post.setAttribute('class','post-wrapper');
+	  post.innerHTML = '<h3>' + arr.title + '</h3><h4>생성 일시 : ' + arr.created_at + '</h4><div>' + arr.body       + '</div>' +'<input type="button" class="delete-button" value="삭제" onclick="deletePost(' + arr.post_id + ')"/><hr>' ;
+	  postList.append(post);
+	});
+  }
+  function submitPost(courseID){
+	const xhr = new XMLHttpRequest();
+	const data = {
+	  title : document.querySelector('#title').value ? document.querySelector('#title').value : 
+	  '제목 없음',
+	  body : document.querySelector('.ql-editor').innerHTML,
+	  course_id : courseID
+	};
+	xhr.open('POST', '/create-post');
+	xhr.setRequestHeader('Content-Type', 'application/json');
+	xhr.onload = function() {
+	  alert(xhr.responseText);
+	  if (xhr.status !== 200) {
+		window.location = '/login';
+		return;
+	  }
+	  document.querySelector('#title').value = '';
+	  document.querySelector('.ql-editor').innerHTML = '';
+	  toggler('#post-display');
+	  viewCourse(courseID);
+	}
+	xhr.send(JSON.stringify(data));
+  }
+function deletePost(postID){
+  let flag = confirm('정말 삭제하시겠습니까?');
+  if(!flag) return;
+  const xhr = new XMLHttpRequest();
+  const data = {
+	post_id: postID
+  };
+  xhr.open('POST', '/delete-post');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+	alert(xhr.responseText);
+	if (xhr.status !== 200) {
+	  window.location = '/login';
+	  return;
+	}
+	toggler('#post-display');
+	viewCourse(courseID);
+  }
+  xhr.send(JSON.stringify(data));
+}
+function createCourse(event){
+  const data = {
+	course_id : document.querySelector('#course-id').value,
+	course_name : document.querySelector('#course-name').value
+  }
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/create-course');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+	alert(xhr.responseText);
+	if (xhr.status === 409){
+	  return;
+	}
+	if (xhr.status === 401 || xhr.status === 400){
+	  window.location='/login';
+	  return;
+	}
+	window.location.reload();
+  }
+  xhr.send(JSON.stringify(data));
+}
+function studentManagement(courseID){
+  const data = {
+	course_id : courseID
+  }
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/student-list');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+	if (xhr.status === 401 || xhr.status === 400){
+	  window.location='/login';
+	  return;
+	}
+	let studentList = JSON.parse(xhr.responseText);
+	buildStudentManagement(studentList);
+  }
+  xhr.send(JSON.stringify(data));
+}
+function buildStudentManagement(studentList){
+  let studentManagementDisplay = document.querySelector('#student-management-display');
+  if(studentManagementDisplay.style.display == 'none'){
+	studentManagementDisplay.style.display = 'block';
+  }
+  else{
+	studentManagementDisplay.style.display = 'none';
+  }
+  let studentListDisplay= document.querySelector('#student-list-display');
+  studentListDisplay.innerHTML = '';
+  if(studentList.length == 0){
+	studentListDisplay.innerHTML = '<i>아직 신청한 학생이 없습니다</i>';
+	return;
+  }
+  studentList.forEach((arr) => {
+	let post = document.createElement('div');
+	post.setAttribute('class','post-wrapper');
+	post.innerHTML = '<h3>' + arr.univ_id+ '</h3><h4>' + arr.name + '</h4><div>' + '<input type="button" class="delete-button" value="수강 취소" onclick="drop(\\'' + arr.course_id + ',' + arr.univ_id +  '\\')"/><hr>' ;
+	studentListDisplay.append(post);
+  });
+}
+function logout(){
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', '/logout');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+	alert(xhr.responseText);
+	if(xhr.status == 200){
+	  window.location = '/login';
+	}
+  }
+  xhr.send();
+}
+	</script>
+  <style>
+	* {
+	  margin: 0px;
+	  padding: 0px;
+	}
+
+	ul, ol {
+	  list-style: none;
+	}
+
+	a {
+	  text-decoration: none
+	}
+	#post-display, #student-management-display{
+	  z-index:1;
+	  position:absolute;
+	  left:5vw;
+	  top:5vh;
+	  background-color: white;
+	  width:90vw;
+	  height:90vh;
+	}
+	#student-management-display{
+	  z-index:2;
+	  position:absolute;
+	  left:15vw;
+	  top:20vh;
+	  background-color: white;
+	  width:70vw;
+	  height:60vh;
+	}
+	#post-list-display{
+	  overflow-y:auto;
+	  height: 40vh;
+	}
+	#text-editor{
+	  height: 40vh;
+	}
+	input[type="text"]{
+	  outline:none;
+	  width: 100%;
+	  border-color: black;
+	}
+
+	</style>
+  </head>
+  <body onload="buildCourseList()">
+	<h1>Simple LMS</h1>
+	<h2>login as : ${id} / ${name} 교수 / ${univ_id}</h2>
+	<input type="button" value="로그아웃" onclick="logout()"/>
+	<div id="course-list-display">
+	</div>
+	<hr>
+	  <h3>새로운 코스 생성</h3>
+	  <div class="form-wrapper">
+		<label for="course-id">Course ID:</label>
+		<input type="text" id="course-id" name="courseId" placeholder="COSE321"><br>
+		<label for="course-name">Course Name:</label>
+		<input type="text" id="course-name" name="courseName" placeholder="컴퓨터시스템설계"><br>
+		<input type="submit" value="Create Course" onclick="createCourse();">
+	  </div>
+	<div id="student-management-display" style="display:none">
+	  <input value="X" type="button" onclick="toggler('#student-management-display')" style="position:relative;"/>
+	  <h3>학생 목록</h3>
+	  <div id="student-list-display">
+	  </div>
+	</div>
+	<div id="post-display" style="display:none">
+	  <input value="X" type="button" onclick="toggler('#post-display')" style="position:relative;"/>
+	  <h2 id="course-title"></h2>
+	  <hr>
+	  <h3> 게시물 </h3>
+	  <hr>
+	  <div id="post-list-display">
+	  </div>
+	  <div id="text-editor">
+		<input placeholder="제목" type="text" id="title"/>
+		<!-- Create the editor container -->
+		<div id="editor">
+		  <p>Hello World!</p>
+		</div>
+		<input value="제출" type="button" id="submit-post" onclick="logout();">
+	  </div>
+	</div>
+	<script src="https://cdn.quilljs.com/1.0.0/quill.js"></script>
+
+	<!-- Initialize Quill editor -->
+	<script>
+	  var editor = new Quill('#editor', {
+		modules: { toolbar: [
+		  [{ header: [1, 2, false] }],
+		  ['bold', 'italic', 'underline'],
+		  ['code-block']
+		]},
+		theme:'snow'
+	  });
+	</script>
+  </body>
+</html>
